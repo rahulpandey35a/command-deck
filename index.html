@@ -105,10 +105,25 @@
   .msg{font-size:11px;color:var(--green);font-family:var(--mono);margin-top:8px}
 </style>
 </head>
-<body>
+<style>
+  .edit{background:#fbfcfb;border:1px solid var(--line);border-radius:9px;padding:12px;margin:6px 0 2px}
+  .edit label{font-size:11px;color:var(--muted);display:block;margin:6px 0 3px}
+  .edit .er{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .live{font-family:var(--mono);font-size:11px;color:var(--green)}
+  .live.stale{color:var(--muted)}
+  .findbox{display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:4px}
+  .findres{margin-top:6px;max-height:150px;overflow:auto}
+  .findres div{padding:7px;border:1px solid var(--line);border-radius:7px;margin-bottom:5px;font-size:12px;cursor:pointer}
+  .findres div:hover{background:var(--green-soft)}
+  .srcpick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+  .srcpick button{font-family:var(--mono);font-size:10px;text-transform:uppercase;padding:5px 9px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer}
+  .srcpick button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .hv{font-family:var(--mono);font-size:10px;color:var(--muted)}
+</style>
+
 <div class="wrap">
   <header>
-    <div><div class="title">Command Deck</div><div class="sub">India + US · one system</div></div>
+    <div><div class="title">Command Deck</div><div class="sub">India + US · live</div></div>
     <div class="date" id="today"></div>
   </header>
 
@@ -123,6 +138,8 @@
     <h2>Portfolio <span class="upd" id="updStamp"></span></h2>
     <div class="total" id="totalVal">-</div>
     <div class="cap" id="totalCap">Total value in INR</div>
+    <button class="ghost" id="refreshAll" style="margin-top:12px">Refresh prices &amp; NAVs</button>
+    <div class="msg" id="liveMsg" style="color:var(--muted)"></div>
     <div id="allocBlock" style="margin-top:16px"></div>
   </div>
 
@@ -138,68 +155,52 @@
     </div>
     <div class="cap" id="deployTotal"></div>
     <div class="split" id="splitBlock" style="margin-top:8px"></div>
-    <div class="disc">New money is steered to your most underweight sleeves first (rebalancing through inflows - no selling, no tax). US portion shown in $ at your set rate; deploy it via INDmoney (LRS).</div>
+    <div class="disc">New money is steered to your most underweight sleeves first. US portion shown in $; deploy via INDmoney.</div>
   </div>
 
   <div class="card">
     <h2>Holdings</h2>
-    <table>
-      <thead><tr><th>Name</th><th>Sleeve</th><th style="text-align:right">Value</th><th></th></tr></thead>
-      <tbody id="holdBody"></tbody>
-    </table>
-    <div class="frm-row">
-      <input id="hName" placeholder="Name">
+    <div id="holdList"></div>
+    <div class="frm-row" style="margin-top:14px">
+      <input id="hName" placeholder="Name / ticker">
       <select id="hCat">
         <option value="India Equity">India Equity</option>
         <option value="US Equity">US Equity</option>
-        <option value="Satellite">Satellite (Multibagger)</option>
-        <option value="Cash">Cash / Stabiliser</option>
+        <option value="Satellite">Satellite</option>
+        <option value="Cash">Cash</option>
       </select>
-      <input id="hAmt" type="number" min="0" step="any" placeholder="Amount">
+      <input id="hAmt" type="number" min="0" step="any" placeholder="Value">
       <select id="hCur"><option value="INR">INR</option><option value="USD">USD</option></select>
       <button class="add" id="addBtn">Add</button>
     </div>
-    <div class="disc">Edit any value inline to refresh it. Tip: break the "US stocks (24)" row into individual names to track single-position risk (flagged above 8% for satellite/direct holdings).</div>
-  </div>
-
-  <div class="card">
-    <h2>Refresh / import</h2>
-    <p class="cap" style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);margin:0 0 8px">
-      Paste current holdings, one per line: <b style="color:var(--ink);font-family:var(--mono)">Name, Sleeve, Amount, Currency</b><br>
-      e.g. <span style="font-family:var(--mono)">Apple, US, 612, USD</span> &nbsp;|&nbsp; <span style="font-family:var(--mono)">Parag Parikh Flexi, India, 280000, INR</span>
-    </p>
-    <textarea id="importBox" placeholder="Nifty 50 Index, India, 300000, INR
-HDFC Bank, India, 150000, INR
-Nvidia, US, 1400, USD
-Cash, Cash, 100000, INR"></textarea>
-    <div class="row-btns">
-      <button class="ghost" id="importAdd">Add these</button>
-      <button class="ghost" id="importReplace">Replace all</button>
-    </div>
-    <div class="msg" id="importMsg"></div>
-    <div class="howto">
-      <b>Where to get the numbers (manual refresh):</b><br>
-      &bull; <b>Zerodha</b> (Indian stocks): Console &rarr; Portfolio &rarr; Holdings, or export to CSV.<br>
-      &bull; <b>Indian mutual funds</b>: your Value Research portfolio, or a Consolidated Account Statement (CAMS/KFintech / MF Central).<br>
-      &bull; <b>INDmoney</b> (US stocks): app &rarr; US Stocks &rarr; Holdings (no public API, so this stays manual).<br>
-      Live auto-sync isn't possible inside this page; it belongs in the server-side agent (Zerodha + MF NAVs can be automated there, INDmoney manual).
-    </div>
+    <div class="disc">Tap a holding to edit it: set US ticker + shares for live prices, or fund scheme code + units for live NAV. Leave units 0 and it keeps the manual value until you add them.</div>
   </div>
 
   <details>
-    <summary>Settings - rate, SIP, step-up, targets</summary>
+    <summary>Settings - rate, prices, SIP, targets</summary>
     <div class="grid2">
       <div><label>USD to INR rate</label><input id="sRate" type="number" step="any"></div>
       <div><label>Base monthly SIP (INR)</label><input id="sSip" type="number" step="any"></div>
       <div><label>Annual step-up (%)</label><input id="sStep" type="number" step="any"></div>
       <div><label>Plan start (YYYY-MM)</label><input id="sStart" type="month"></div>
     </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink);margin:0">
+        <input id="sRateAuto" type="checkbox" style="width:auto;padding:0">Auto-update USD/INR</label>
+      <button class="ghost" id="rateRefresh">Refresh rate now</button>
+    </div>
+    <div class="msg" id="rateStatus" style="color:var(--muted)"></div>
+    <div style="margin-top:14px">
+      <label style="font-size:12px;color:var(--muted)">US price API key (free, from twelvedata.com) - enables live US stock prices</label>
+      <input id="sApiKey" type="text" placeholder="paste free Twelve Data API key (optional)">
+      <div class="disc">Without a key, US value still moves with the live USD/INR rate; the dollar price stays at last known (editable per stock).</div>
+    </div>
     <div class="cap" style="margin:16px 0 6px">Target allocation (%)</div>
     <div class="grid2">
       <div><label>India Equity</label><input id="tIndia" type="number" step="any"></div>
       <div><label>US Equity</label><input id="tUS" type="number" step="any"></div>
       <div><label>Satellite</label><input id="tSat" type="number" step="any"></div>
-      <div><label>Cash / Stabiliser</label><input id="tCash" type="number" step="any"></div>
+      <div><label>Cash</label><input id="tCash" type="number" step="any"></div>
     </div>
     <button class="ghost" id="saveBtn" style="margin-top:14px">Save settings</button>
     <div class="msg" id="saveMsg"></div>
@@ -211,11 +212,9 @@ Cash, Cash, 100000, INR"></textarea>
     <button class="ghost" id="copyBtn" style="margin-top:12px">Copy brief</button>
   </div>
 
-  <p class="disc">
-    Analyses the figures <em>you</em> maintain - it does not fetch live prices, and it is not investment advice.
-    Update values when you check in. Rules: rebalance flag at &gt;5pp drift; satellite capped at 20% of equity; single satellite/direct position flagged above 8%.
-    Most days the verdict is "stay the course" - that is the system working.
-  </p>
+  <p class="disc">Prices/NAVs/rate auto-update from free public sources; everything is editable. Not investment advice.
+  Rules: rebalance flag at &gt;5pp drift; satellite cap 20% of equity; single satellite position flagged above 8%.
+  Most days the verdict is "stay the course".</p>
 </div>
 
 <script>
@@ -225,106 +224,175 @@ const TAGCLS={"India Equity":"","US Equity":"us","Satellite":"sat","Cash":"cash"
 const now=new Date();
 const DEF={
   holdings:[
-    {name:"ICICI Pru Large & Mid Cap",cat:"India Equity",amt:379871,cur:"INR"},
-    {name:"Parag Parikh Flexi Cap",cat:"India Equity",amt:370139,cur:"INR"},
-    {name:"ICICI Pru Value",cat:"India Equity",amt:368426,cur:"INR"},
-    {name:"Bandhan Small Cap",cat:"India Equity",amt:111352,cur:"INR"},
-    {name:"Edelweiss Mid Cap",cat:"India Equity",amt:109712,cur:"INR"},
-    {name:"Quant ELSS Tax Saver",cat:"India Equity",amt:2117,cur:"INR"},
-    {name:"LMT",cat:"US Equity",amt:82.49,cur:"USD"},
-    {name:"TMO",cat:"US Equity",amt:212.68,cur:"USD"},
-    {name:"GOOGL",cat:"US Equity",amt:165,cur:"USD"},
-    {name:"META",cat:"US Equity",amt:149.66,cur:"USD"},
-    {name:"AAPL",cat:"US Equity",amt:174,cur:"USD"},
-    {name:"KNSL",cat:"US Equity",amt:412,cur:"USD"},
-    {name:"TSM",cat:"US Equity",amt:170,cur:"USD"},
-    {name:"AMZN",cat:"US Equity",amt:761,cur:"USD"},
-    {name:"NVDA",cat:"US Equity",amt:606.37,cur:"USD"},
-    {name:"MSFT",cat:"US Equity",amt:1272.5,cur:"USD"},
-    {name:"KLAC",cat:"US Equity",amt:399.99,cur:"USD"},
-    {name:"NEE",cat:"US Equity",amt:85.84,cur:"USD"},
-    {name:"ETN",cat:"US Equity",amt:140,cur:"USD"},
-    {name:"TDG",cat:"US Equity",amt:212,cur:"USD"},
-    {name:"ICE",cat:"US Equity",amt:164,cur:"USD"},
-    {name:"TOST",cat:"US Equity",amt:443.62,cur:"USD"},
-    {name:"PANW",cat:"US Equity",amt:831.33,cur:"USD"},
-    {name:"CEG",cat:"US Equity",amt:1122,cur:"USD"},
-    {name:"COST",cat:"US Equity",amt:140,cur:"USD"},
-    {name:"RKLB",cat:"US Equity",amt:65,cur:"USD"},
-    {name:"CDNS",cat:"US Equity",amt:390,cur:"USD"},
-    {name:"V",cat:"US Equity",amt:363.13,cur:"USD"},
-    {name:"TSLA",cat:"US Equity",amt:112.19,cur:"USD"},
-    {name:"ISRG",cat:"US Equity",amt:676.57,cur:"USD"},
-    {name:"Cash",cat:"Cash",amt:100000,cur:"INR"}
+    {name:"ICICI Pru Large & Mid Cap",cat:"India Equity",src:"mf",scheme:"",units:0,amt:379871,cur:"INR"},
+    {name:"Parag Parikh Flexi Cap",cat:"India Equity",src:"mf",scheme:"122639",units:0,amt:370139,cur:"INR"},
+    {name:"ICICI Pru Value",cat:"India Equity",src:"mf",scheme:"",units:0,amt:368426,cur:"INR"},
+    {name:"Bandhan Small Cap",cat:"India Equity",src:"mf",scheme:"",units:0,amt:111352,cur:"INR"},
+    {name:"Edelweiss Mid Cap",cat:"India Equity",src:"mf",scheme:"",units:0,amt:109712,cur:"INR"},
+    {name:"Quant ELSS Tax Saver",cat:"India Equity",src:"mf",scheme:"",units:0,amt:2117,cur:"INR"},
+    {name:"LMT",cat:"US Equity",src:"us",sym:"LMT",qty:0.155575,px:530.23,cur:"USD"},
+    {name:"TMO",cat:"US Equity",src:"us",sym:"TMO",qty:0.37921,px:560.85,cur:"USD"},
+    {name:"GOOGL",cat:"US Equity",src:"us",sym:"GOOGL",qty:0.511647,px:322.49,cur:"USD"},
+    {name:"META",cat:"US Equity",src:"us",sym:"META",qty:0.227571,px:657.64,cur:"USD"},
+    {name:"AAPL",cat:"US Equity",src:"us",sym:"AAPL",qty:0.646108,px:269.3,cur:"USD"},
+    {name:"KNSL",cat:"US Equity",src:"us",sym:"KNSL",qty:1.207208,px:341.28,cur:"USD"},
+    {name:"TSM",cat:"US Equity",src:"us",sym:"TSM",qty:0.517771,px:328.33,cur:"USD"},
+    {name:"AMZN",cat:"US Equity",src:"us",sym:"AMZN",qty:3.60838,px:210.9,cur:"USD"},
+    {name:"NVDA",cat:"US Equity",src:"us",sym:"NVDA",qty:3.229067,px:187.78,cur:"USD"},
+    {name:"MSFT",cat:"US Equity",src:"us",sym:"MSFT",qty:3.153672,px:403.5,cur:"USD"},
+    {name:"KLAC",cat:"US Equity",src:"us",sym:"KLAC",qty:2.696431,px:148.34,cur:"USD"},
+    {name:"NEE",cat:"US Equity",src:"us",sym:"NEE",qty:1.057141,px:81.2,cur:"USD"},
+    {name:"ETN",cat:"US Equity",src:"us",sym:"ETN",qty:0.428456,px:326.75,cur:"USD"},
+    {name:"TDG",cat:"US Equity",src:"us",sym:"TDG",qty:0.163506,px:1296.59,cur:"USD"},
+    {name:"ICE",cat:"US Equity",src:"us",sym:"ICE",qty:1.061749,px:154.46,cur:"USD"},
+    {name:"TOST",cat:"US Equity",src:"us",sym:"TOST",qty:16.015406,px:27.7,cur:"USD"},
+    {name:"PANW",cat:"US Equity",src:"us",sym:"PANW",qty:5.130122,px:162.05,cur:"USD"},
+    {name:"CEG",cat:"US Equity",src:"us",sym:"CEG",qty:4.01549,px:279.42,cur:"USD"},
+    {name:"COST",cat:"US Equity",src:"us",sym:"COST",qty:0.14866,px:941.75,cur:"USD"},
+    {name:"RKLB",cat:"US Equity",src:"us",sym:"RKLB",qty:0.756132,px:85.96,cur:"USD"},
+    {name:"CDNS",cat:"US Equity",src:"us",sym:"CDNS",qty:1.350166,px:288.85,cur:"USD"},
+    {name:"V",cat:"US Equity",src:"us",sym:"V",qty:1.097362,px:330.91,cur:"USD"},
+    {name:"TSLA",cat:"US Equity",src:"us",sym:"TSLA",qty:0.247354,px:453.56,cur:"USD"},
+    {name:"ISRG",cat:"US Equity",src:"us",sym:"ISRG",qty:1.359204,px:497.77,cur:"USD"},
+    {name:"Cash",cat:"Cash",src:"manual",amt:100000,cur:"INR"}
   ],
   targets:{"India Equity":58,"US Equity":32,"Satellite":0,"Cash":10},
-  rate:94.5, sip:100000, step:5,
-  startY:now.getFullYear(), startM:now.getMonth(), updated:null
+  rate:94.5, sip:100000, step:5, rateAuto:true, rateUpdated:null, rateSource:null,
+  apiKey:"", px:{}, nav:{}, startY:now.getFullYear(), startM:now.getMonth(), updated:null
 };
 let S=JSON.parse(JSON.stringify(DEF));
+let EDIT=-1;
 
 const fmt=n=>"\u20b9"+Math.round(n).toLocaleString("en-IN");
-const fUsd=n=>"$"+Math.round(n).toLocaleString("en-US");
+const fUsd=n=>"$"+(Math.round(n*100)/100).toLocaleString("en-US");
 const $=id=>document.getElementById(id);
 $("today").textContent=now.toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric"});
 
-function catFrom(s){s=(s||"").toLowerCase();
-  if(s.includes("sat")||s.includes("multi")||s.includes("bagger"))return"Satellite";
-  if(s.includes("cash")||s.includes("stab")||s.includes("debt")||s.includes("liquid"))return"Cash";
-  if(s.includes("us")||s.includes("america")||s.includes("nasdaq")||s.includes("s&p"))return"US Equity";
-  return"India Equity";}
-function curFrom(s){s=(s||"").toLowerCase();return(s.includes("usd")||s.includes("$")||s.includes("dollar"))?"USD":"INR";}
-
 async function load(){
-  try{const v=localStorage.getItem("deck-v2");
-    if(v){const d=JSON.parse(v);S={...S,...d};S.targets={...DEF.targets,...(d.targets||{})};}
+  try{const v=localStorage.getItem("deck-v3");
+    if(v){const d=JSON.parse(v);S={...S,...d};S.targets={...DEF.targets,...(d.targets||{})};S.px=d.px||{};S.nav=d.nav||{};}
   }catch(e){}
-  $("sRate").value=S.rate;$("sSip").value=S.sip;$("sStep").value=S.step;
+  $("sRate").value=S.rate;$("sSip").value=S.sip;$("sStep").value=S.step;$("sApiKey").value=S.apiKey||"";
+  $("sRateAuto").checked=S.rateAuto!==false;
   $("sStart").value=`${S.startY}-${String(S.startM+1).padStart(2,"0")}`;
   $("tIndia").value=S.targets["India Equity"];$("tUS").value=S.targets["US Equity"];
   $("tSat").value=S.targets["Satellite"];$("tCash").value=S.targets["Cash"];
   render();
+  refreshAll(true);
 }
-async function save(){try{localStorage.setItem("deck-v2",JSON.stringify(S));}catch(e){console.error(e);}}
+async function save(){try{localStorage.setItem("deck-v3",JSON.stringify(S));}catch(e){console.error(e);}}
 function touch(){S.updated=Date.now();}
 
-const inr=h=>h.cur==="USD"?(Number(h.amt)||0)*S.rate:(Number(h.amt)||0);
+// ---------- valuation ----------
+function holdINR(h){
+  if(h.src==="us"){const p=(S.px[h.sym]!=null?S.px[h.sym]:h.px)||0;return (Number(h.qty)||0)*p*S.rate;}
+  if(h.src==="mf"){const n=S.nav[h.scheme];if(h.units>0&&n)return (Number(h.units)||0)*n.nav;return Number(h.amt)||0;}
+  return h.cur==="USD"?(Number(h.amt)||0)*S.rate:(Number(h.amt)||0);
+}
 function totals(){const t={"India Equity":0,"US Equity":0,"Satellite":0,"Cash":0};
-  S.holdings.forEach(h=>t[h.cat]+=inr(h));
-  return {t,total:Object.values(t).reduce((a,b)=>a+b,0)};}
+  S.holdings.forEach(h=>t[h.cat]+=holdINR(h));return {t,total:Object.values(t).reduce((a,b)=>a+b,0)};}
 function yearsElapsed(){return Math.max(0,Math.floor(((now.getFullYear()-S.startY)*12+(now.getMonth()-S.startM))/12));}
 function sipNow(){return S.sip*Math.pow(1+S.step/100,yearsElapsed());}
 
-function allocate(deploy){
-  const {t,total}=totals();const tt=total+deploy;const a={},g={};let sg=0;
-  CATS.forEach(c=>{const des=tt*(S.targets[c]||0)/100;const gap=Math.max(0,des-t[c]);g[c]=gap;sg+=gap;a[c]=0;});
-  if(deploy<=sg&&sg>0){CATS.forEach(c=>a[c]=deploy*g[c]/sg);}
-  else{CATS.forEach(c=>a[c]=g[c]);let left=deploy-sg;const ts=CATS.reduce((s,c)=>s+(S.targets[c]||0),0)||100;CATS.forEach(c=>a[c]+=left*(S.targets[c]||0)/ts);}
-  return a;
+// ---------- live fetch ----------
+async function fetchUsdInr(){
+  const srcs=[{u:"https://open.er-api.com/v6/latest/USD",p:d=>d&&d.rates&&d.rates.INR,n:"er-api"},
+    {u:"https://api.frankfurter.app/latest?from=USD&to=INR",p:d=>d&&d.rates&&d.rates.INR,n:"frankfurter"},
+    {u:"https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json",p:d=>d&&d.usd&&d.usd.inr,n:"currency-api"}];
+  for(const s of srcs){try{const r=await fetch(s.u,{cache:"no-store"});if(!r.ok)continue;const d=await r.json();const v=s.p(d);if(v&&isFinite(v))return{rate:Number(v),source:s.n};}catch(e){}}
+  return null;
 }
+async function fetchNavs(){
+  const codes=[...new Set(S.holdings.filter(h=>h.src==="mf"&&h.scheme).map(h=>h.scheme))];
+  let ok=0;
+  for(const c of codes){
+    try{const r=await fetch(`https://api.mfapi.in/mf/${c}/latest`,{cache:"no-store"});
+      if(!r.ok)continue;const d=await r.json();
+      if(d&&d.data&&d.data[0]){S.nav[c]={nav:parseFloat(d.data[0].nav),name:(d.meta&&d.meta.scheme_name)||"",date:d.data[0].date};ok++;}
+    }catch(e){}
+  }
+  return ok;
+}
+async function fetchPrices(){
+  const syms=[...new Set(S.holdings.filter(h=>h.src==="us"&&h.sym).map(h=>h.sym))];
+  if(!syms.length||!S.apiKey)return 0;
+  let ok=0;
+  try{
+    const r=await fetch(`https://api.twelvedata.com/price?symbol=${syms.join(",")}&apikey=${encodeURIComponent(S.apiKey)}`,{cache:"no-store"});
+    const d=await r.json();
+    if(syms.length===1){if(d&&d.price){S.px[syms[0]]=parseFloat(d.price);ok++;}}
+    else{for(const s of syms){if(d[s]&&d[s].price){S.px[s]=parseFloat(d[s].price);ok++;}}}
+    // write last px back onto holdings
+    S.holdings.forEach(h=>{if(h.src==="us"&&S.px[h.sym]!=null)h.px=S.px[h.sym];});
+  }catch(e){}
+  return ok;
+}
+async function refreshAll(silent){
+  if(!silent)$("liveMsg").textContent="Refreshing\u2026";
+  if(S.rateAuto!==false){const res=await fetchUsdInr();if(res){S.rate=res.rate;S.rateUpdated=Date.now();S.rateSource=res.source;$("sRate").value=(+S.rate).toFixed(2);}}
+  const nv=await fetchNavs();
+  const pr=await fetchPrices();
+  // refresh stored MF value from live nav*units
+  S.holdings.forEach(h=>{if(h.src==="mf"&&h.units>0&&S.nav[h.scheme])h.amt=Math.round((Number(h.units)||0)*S.nav[h.scheme].nav);});
+  S.updated=Date.now();save();render();
+  const bits=[];
+  bits.push(S.rateUpdated?`USD/INR \u20b9${(+S.rate).toFixed(2)}`:"rate manual");
+  bits.push(`${nv} NAV${nv===1?"":"s"}`);
+  bits.push(S.apiKey?`${pr} US price${pr===1?"":"s"}`:"US prices need free key (Settings)");
+  $("liveMsg").textContent="Updated \u00b7 "+bits.join(" \u00b7 ")+" \u00b7 "+new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
+}
+async function refreshRate(silent){
+  if(!silent)$("rateStatus").textContent="Fetching\u2026";
+  const res=await fetchUsdInr();
+  if(res){S.rate=res.rate;S.rateUpdated=Date.now();S.rateSource=res.source;$("sRate").value=(+S.rate).toFixed(2);save();render();}
+  $("rateStatus").textContent=rateStatusText();
+}
+function rateStatusText(){
+  if(S.rateAuto===false)return `Manual rate: \u20b9${S.rate}`;
+  if(S.rateUpdated)return `Auto \u00b7 \u20b9${(+S.rate).toFixed(2)} \u00b7 ${S.rateSource||""} \u00b7 ${new Date(S.rateUpdated).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}`;
+  return "Auto-update on";
+}
+
+// ---------- MF scheme finder ----------
+async function mfFind(q,box){
+  box.innerHTML="<div class='hv'>Searching\u2026</div>";
+  try{const r=await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`,{cache:"no-store"});
+    const d=await r.json();
+    if(!d.length){box.innerHTML="<div class='hv'>No matches.</div>";return;}
+    box.innerHTML="";
+    d.slice(0,12).forEach(x=>{const el=document.createElement("div");
+      el.textContent=`${x.schemeCode} \u2014 ${x.schemeName}`;
+      el.onclick=()=>{S.holdings[EDIT].scheme=String(x.schemeCode);save();render();};
+      box.appendChild(el);});
+  }catch(e){box.innerHTML="<div class='hv'>Search failed - check connection.</div>";}
+}
+
+// ---------- analysis ----------
 function analyse(){
-  const {t,total}=totals();const actions=[];
+  const {t,total}=totals();const a=[];
   if(total>0){
     CATS.forEach(c=>{const pct=t[c]/total*100,dr=pct-(S.targets[c]||0);
-      if(Math.abs(dr)>5)actions.push(`Rebalance: ${LABEL[c]} is ${Math.abs(dr).toFixed(1)}pp ${dr>0?"over":"under"} target - direct new money ${dr>0?"away from":"toward"} it.`);});
+      if(Math.abs(dr)>5)a.push(`Rebalance: ${LABEL[c]} is ${Math.abs(dr).toFixed(1)}pp ${dr>0?"over":"under"} target - direct new money ${dr>0?"away from":"toward"} it.`);});
     const eq=t["India Equity"]+t["US Equity"]+t["Satellite"];
-    if(eq>0&&t["Satellite"]/eq*100>20)actions.push(`Satellite is ${(t["Satellite"]/eq*100).toFixed(1)}% of equity - above the 20% cap. Trim toward the core.`);
-    S.holdings.forEach(h=>{if(h.cat==="Satellite"){const p=inr(h)/total*100;if(p>8)actions.push(`${h.name} is ${p.toFixed(1)}% of the portfolio - over the 8% single-position limit. Trim for risk.`);}});
+    if(eq>0&&t["Satellite"]/eq*100>20)a.push(`Satellite is ${(t["Satellite"]/eq*100).toFixed(1)}% of equity - above the 20% cap. Trim toward the core.`);
+    S.holdings.forEach(h=>{if(h.cat==="Satellite"){const p=holdINR(h)/total*100;if(p>8)a.push(`${h.name} is ${p.toFixed(1)}% of the portfolio - over the 8% single-position limit.`);}});
   }
-  return {t,total,actions};
+  return {t,total,actions:a};
 }
 
 function render(){
   const {t,total,actions}=analyse();
   const v=$("verdict");$("actionList").innerHTML="";
   if(total===0){v.classList.remove("act");$("vStatus").textContent="Stay the course";$("vNote").textContent="Add holdings to run the analysis.";}
-  else if(actions.length===0){v.classList.remove("act");$("vStatus").textContent="Stay the course";$("vNote").textContent="Allocation within tolerance, no risk breaches. Deploy this month's SIP per the plan below - otherwise nothing to do.";}
+  else if(!actions.length){v.classList.remove("act");$("vStatus").textContent="Stay the course";$("vNote").textContent="Allocation within tolerance, no risk breaches. Deploy this month's SIP below - otherwise nothing to do.";}
   else{v.classList.add("act");$("vStatus").textContent="Action needed";$("vNote").textContent=`${actions.length} item${actions.length>1?"s":""} to address, plus this month's SIP below.`;
-    actions.forEach(a=>{const li=document.createElement("li");li.textContent=a;$("actionList").appendChild(li);});}
+    actions.forEach(x=>{const li=document.createElement("li");li.textContent=x;$("actionList").appendChild(li);});}
 
   $("updStamp").textContent=S.updated?("updated "+new Date(S.updated).toLocaleDateString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})):"";
   $("totalVal").textContent=total>0?fmt(total):"-";
-  $("totalCap").textContent=total>0?`Total in INR \u00b7 USD held converted at \u20b9${S.rate}/$`:"Total value in INR";
+  $("totalCap").textContent=total>0?`Total in INR \u00b7 USD @ \u20b9${(+S.rate).toFixed(2)}/$ ${S.rateAuto===false?"(manual)":"(auto)"}`:"Total value in INR";
+  if($("rateStatus"))$("rateStatus").textContent=rateStatusText();
+
   const ab=$("allocBlock");ab.innerHTML="";
   if(total>0)CATS.forEach(c=>{const pct=t[c]/total*100,tg=S.targets[c]||0,dr=pct-tg;
     const cls=Math.abs(dr)>5?"bad":(Math.abs(dr)>2.5?"warn":"ok");
@@ -334,79 +402,101 @@ function render(){
       <div class="bar"><div class="fill ${Math.abs(dr)>5?"warn":""}" style="width:${Math.min(pct,100)}%"></div><div class="tmark" style="left:${Math.min(tg,100)}%"></div></div>`;
     ab.appendChild(row);});
 
+  // holdings list
+  const HL=$("holdList");HL.innerHTML="";
+  S.holdings.forEach((h,i)=>{
+    const val=holdINR(h);
+    const wrap=document.createElement("div");wrap.style.borderBottom="1px solid var(--line)";wrap.style.padding="9px 0";
+    let sub="";
+    if(h.src==="us"){const p=(S.px[h.sym]!=null?S.px[h.sym]:h.px)||0;sub=`<span class="hv">${(+h.qty).toFixed(4)} sh \u00d7 ${fUsd(p)}${S.px[h.sym]!=null?'<span class="live"> live</span>':' last'}</span>`;}
+    else if(h.src==="mf"){const n=S.nav[h.scheme];sub = h.scheme?(n?`<span class="hv">NAV \u20b9${n.nav}${h.units>0?` \u00d7 ${h.units} u`:" \u00b7 set units"}</span>`:`<span class="hv">code ${h.scheme} \u00b7 NAV pending</span>`):`<span class="hv">no scheme code \u00b7 manual</span>`;}
+    else sub=`<span class="hv">manual</span>`;
+    wrap.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div><div style="font-size:14px">${h.name} <span class="tag ${TAGCLS[h.cat]}">${LABEL[h.cat]}</span></div>${sub}</div>
+      <div style="text-align:right"><div class="num" style="font-family:var(--mono)">${fmt(val)}</div>
+        <button class="del" data-e="${i}" style="color:var(--muted);font-size:13px">edit</button>
+        <button class="del" data-d="${i}">\u00d7</button></div></div>`;
+    HL.appendChild(wrap);
+    if(EDIT===i){HL.appendChild(editPanel(h,i));}
+  });
+  HL.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{S.holdings.splice(+b.dataset.d,1);if(EDIT===+b.dataset.d)EDIT=-1;touch();save();render();});
+  HL.querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>{EDIT=EDIT===+b.dataset.e?-1:+b.dataset.e;render();});
+
   const sn=sipNow();$("sipNow").textContent=fmt(sn);$("planYear").textContent="Year "+(yearsElapsed()+1);
   doPlan();
-
-  const hb=$("holdBody");hb.innerHTML="";
-  if(!S.holdings.length)hb.innerHTML=`<tr><td colspan="4" class="empty">No holdings yet.</td></tr>`;
-  else S.holdings.forEach((h,i)=>{const tr=document.createElement("tr");
-    const eq=h.cur==="USD"?`<span class="eq">= ${fmt(inr(h))}</span>`:"";
-    tr.innerHTML=`<td class="nm">${h.name}<br><span class="tag ${TAGCLS[h.cat]}">${LABEL[h.cat]}</span></td>
-      <td></td>
-      <td><div class="amtwrap"><input class="amt-in" type="number" step="any" data-i="${i}" value="${h.amt}"><span class="cur-mini">${h.cur}</span></div>${eq}</td>
-      <td style="text-align:right"><button class="del" data-i="${i}">\u00d7</button></td>`;
-    hb.appendChild(tr);});
-  hb.querySelectorAll(".amt-in").forEach(inp=>inp.onchange=()=>{const i=+inp.dataset.i;const val=parseFloat(inp.value);
-    if(!isNaN(val)){S.holdings[i].amt=val;touch();save();render();}});
-  hb.querySelectorAll(".del").forEach(b=>b.onclick=()=>{S.holdings.splice(+b.dataset.i,1);touch();save();render();});
-
   buildBrief(t,total,actions,sn);
 }
 
-function doPlan(){
-  const extra=parseFloat($("lumpAmt").value)||0;const deploy=sipNow()+extra;
+function editPanel(h,i){
+  const d=document.createElement("div");d.className="edit";
+  const srcBtns=`<div class="srcpick">
+    <button data-s="us" class="${h.src==="us"?"on":""}">Auto US stock</button>
+    <button data-s="mf" class="${h.src==="mf"?"on":""}">Auto MF (NAV)</button>
+    <button data-s="manual" class="${h.src==="manual"?"on":""}">Manual value</button></div>`;
+  let fields="";
+  if(h.src==="us"){fields=`<div class="er"><div><label>Ticker</label><input id="e_sym" value="${h.sym||""}"></div>
+    <div><label>Shares</label><input id="e_qty" type="number" step="any" value="${h.qty||0}"></div></div>
+    <label>Last price (USD) - auto-fills with key</label><input id="e_px" type="number" step="any" value="${h.px||0}">`;}
+  else if(h.src==="mf"){const n=S.nav[h.scheme];
+    fields=`<div class="er"><div><label>Scheme code</label><input id="e_scheme" value="${h.scheme||""}"></div>
+    <div><label>Units</label><input id="e_units" type="number" step="any" value="${h.units||0}"></div></div>
+    ${n?`<div class="live">${n.name||""} \u00b7 NAV \u20b9${n.nav} (${n.date})</div>`:`<div class="hv">Enter code or find it below; NAV loads on refresh.</div>`}
+    <label>Find scheme code</label><div class="findbox"><input id="e_find" placeholder="${h.name}"><button class="ghost" id="e_findbtn">Find</button></div>
+    <div class="findres" id="e_findres"></div>
+    <label>Fallback value (INR, used until units set)</label><input id="e_amt" type="number" step="any" value="${h.amt||0}">`;}
+  else{fields=`<div class="er"><div><label>Value</label><input id="e_amt" type="number" step="any" value="${h.amt||0}"></div>
+    <div><label>Currency</label><select id="e_cur"><option ${h.cur!=="USD"?"selected":""}>INR</option><option ${h.cur==="USD"?"selected":""}>USD</option></select></div></div>`;}
+  d.innerHTML=`<label>Price source</label>${srcBtns}<div class="er" style="grid-template-columns:1fr"><div><label>Name</label><input id="e_name" value="${h.name||""}"></div></div>${fields}
+    <button class="ghost" id="e_save" style="margin-top:10px">Done</button>`;
+  setTimeout(()=>{
+    d.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{S.holdings[i].src=b.dataset.s;save();render();});
+    const fb=d.querySelector("#e_findbtn");if(fb)fb.onclick=()=>mfFind(d.querySelector("#e_find").value||h.name,d.querySelector("#e_findres"));
+    d.querySelector("#e_save").onclick=()=>{const g=id=>d.querySelector("#"+id);
+      h.name=g("e_name").value||h.name;
+      if(h.src==="us"){h.sym=(g("e_sym").value||"").toUpperCase();h.qty=+g("e_qty").value||0;h.px=+g("e_px").value||h.px;}
+      else if(h.src==="mf"){h.scheme=g("e_scheme").value.trim();h.units=+g("e_units").value||0;h.amt=+g("e_amt").value||h.amt;}
+      else{h.amt=+g("e_amt").value||0;h.cur=g("e_cur").value;}
+      EDIT=-1;touch();save();render();refreshAll(true);};
+  },0);
+  return d;
+}
+
+function allocate(deploy){const {t,total}=totals();const tt=total+deploy;const a={},g={};let sg=0;
+  CATS.forEach(c=>{const des=tt*(S.targets[c]||0)/100;const gap=Math.max(0,des-t[c]);g[c]=gap;sg+=gap;a[c]=0;});
+  if(deploy<=sg&&sg>0)CATS.forEach(c=>a[c]=deploy*g[c]/sg);
+  else{CATS.forEach(c=>a[c]=g[c]);let left=deploy-sg;const ts=CATS.reduce((s,c)=>s+(S.targets[c]||0),0)||100;CATS.forEach(c=>a[c]+=left*(S.targets[c]||0)/ts);}
+  return a;}
+function doPlan(){const extra=parseFloat($("lumpAmt").value)||0;const deploy=sipNow()+extra;
   $("deployTotal").textContent=`Deploying ${fmt(deploy)}${extra?` (SIP ${fmt(sipNow())} + lump ${fmt(extra)})`:""}`;
   const a=allocate(deploy);const box=$("splitBlock");box.innerHTML="";let any=false;
   CATS.forEach(c=>{if(a[c]>1){any=true;const usd=c==="US Equity"?`<span class="usd">= ${fUsd(a[c]/S.rate)}</span>`:"";
     box.innerHTML+=`<div><span>${LABEL[c]}${usd}</span><span class="amt">${fmt(a[c])}</span></div>`;}});
-  if(!any)box.innerHTML=`<div class="none">Set a SIP amount or targets in Settings to generate a deployment plan.</div>`;
-}
+  if(!any)box.innerHTML=`<div class="none">Set SIP/targets in Settings.</div>`;}
 
 function buildBrief(t,total,actions,sn){
   const d=now.toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   if(total===0){$("brief").textContent="Add holdings to generate the brief.";return;}
-  let s=`DAILY BRIEF - ${d}\n\nPortfolio: ${fmt(total)} (USD @ \u20b9${S.rate})\n\nAllocation vs target:\n`;
-  CATS.forEach(c=>{const pct=t[c]/total*100,dr=pct-(S.targets[c]||0);
-    s+=`  - ${LABEL[c]}: ${pct.toFixed(1)}% (t${S.targets[c]||0}%, ${dr>=0?"+":""}${dr.toFixed(1)}pp)\n`;});
+  let s=`DAILY BRIEF - ${d}\n\nPortfolio: ${fmt(total)} (USD @ \u20b9${(+S.rate).toFixed(2)})\n\nAllocation vs target:\n`;
+  CATS.forEach(c=>{const pct=t[c]/total*100,dr=pct-(S.targets[c]||0);s+=`  - ${LABEL[c]}: ${pct.toFixed(1)}% (t${S.targets[c]||0}%, ${dr>=0?"+":""}${dr.toFixed(1)}pp)\n`;});
   s+=`\nThis month's SIP: ${fmt(sn)} (Year ${yearsElapsed()+1})\nDeploy to:\n`;
-  const a=allocate(sn);
-  CATS.forEach(c=>{if(a[c]>1)s+=`  -> ${LABEL[c]}: ${fmt(a[c])}${c==="US Equity"?` (~${fUsd(a[c]/S.rate)} via INDmoney)`:""}\n`;});
+  const a=allocate(sn);CATS.forEach(c=>{if(a[c]>1)s+=`  -> ${LABEL[c]}: ${fmt(a[c])}${c==="US Equity"?` (~${fUsd(a[c]/S.rate)} via INDmoney)`:""}\n`;});
   s+=`\nAction items:\n`+(actions.length?actions.map(x=>"  > "+x).join("\n"):"  ok None beyond the SIP above. Stay the course.");
-  s+=`\n\nDiscipline note: ${actions.length?"Address the flags with intent - no extra trades.":"Deploy the SIP, then do nothing. Time in the market is the strategy."}`;
   $("brief").textContent=s;
 }
 
-$("addBtn").onclick=()=>{const name=$("hName").value.trim(),amt=parseFloat($("hAmt").value);
-  if(!name||isNaN(amt))return;
-  S.holdings.push({name,cat:$("hCat").value,amt,cur:$("hCur").value});
-  $("hName").value="";$("hAmt").value="";touch();save();render();};
-
-function parseImport(){
-  const lines=$("importBox").value.split("\n").map(l=>l.trim()).filter(Boolean);
-  const out=[];
-  lines.forEach(l=>{const p=l.split(/[,|\t]/).map(x=>x.trim());
-    if(p.length<3)return;
-    const name=p[0];const cat=catFrom(p[1]);
-    const amt=parseFloat((p[2]||"").replace(/[^0-9.\-]/g,""));
-    const cur=curFrom(p[3]!==undefined?p[3]:(/\$/.test(p[2])?"usd":"inr"));
-    if(name&&!isNaN(amt))out.push({name,cat,amt,cur});});
-  return out;
-}
-$("importAdd").onclick=()=>{const rows=parseImport();if(!rows.length){$("importMsg").textContent="Nothing parsed - check the format.";return;}
-  S.holdings=S.holdings.concat(rows);touch();save();render();$("importMsg").textContent=`Added ${rows.length} holding(s).`;$("importBox").value="";};
-$("importReplace").onclick=()=>{const rows=parseImport();if(!rows.length){$("importMsg").textContent="Nothing parsed - check the format.";return;}
-  S.holdings=rows;touch();save();render();$("importMsg").textContent=`Replaced with ${rows.length} holding(s).`;$("importBox").value="";};
-
+$("addBtn").onclick=()=>{const name=$("hName").value.trim(),amt=parseFloat($("hAmt").value);if(!name||isNaN(amt))return;
+  S.holdings.push({name,cat:$("hCat").value,src:"manual",amt,cur:$("hCur").value});$("hName").value="";$("hAmt").value="";touch();save();render();};
 $("planBtn").onclick=doPlan;
-$("saveBtn").onclick=()=>{
-  S.rate=+$("sRate").value||S.rate;S.sip=+$("sSip").value||0;S.step=+$("sStep").value||0;
+$("refreshAll").onclick=()=>refreshAll(false);
+$("rateRefresh").onclick=()=>refreshRate(false);
+$("saveBtn").onclick=()=>{S.rateAuto=$("sRateAuto").checked;S.rate=+$("sRate").value||S.rate;S.sip=+$("sSip").value||0;S.step=+$("sStep").value||0;S.apiKey=$("sApiKey").value.trim();
   const sv=$("sStart").value;if(sv){const[y,m]=sv.split("-");S.startY=+y;S.startM=+m-1;}
   S.targets={"India Equity":+$("tIndia").value||0,"US Equity":+$("tUS").value||0,"Satellite":+$("tSat").value||0,"Cash":+$("tCash").value||0};
   const sum=Object.values(S.targets).reduce((a,b)=>a+b,0);
   $("saveMsg").textContent=`Saved. Targets total ${sum.toFixed(0)}%.`+(Math.abs(sum-100)>0.5?" (should be 100%)":" ok");
-  save();render();};
-$("copyBtn").onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText($("brief").textContent);
-  $("copyBtn").textContent="Copied";setTimeout(()=>$("copyBtn").textContent="Copy brief",1500);};
+  if(!S.rateAuto){S.rateUpdated=null;S.rateSource=null;}
+  save();render();refreshAll(false);};
+$("copyBtn").onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText($("brief").textContent);$("copyBtn").textContent="Copied";setTimeout(()=>$("copyBtn").textContent="Copy brief",1500);};
 
 load();
 </script>
