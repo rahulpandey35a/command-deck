@@ -176,6 +176,14 @@
     <div class="disc">Tap a holding to edit it: set US ticker + shares for live prices, or fund scheme code + units for live NAV. Leave units 0 and it keeps the manual value until you add them.</div>
   </div>
 
+  <div class="card">
+    <h2>Allocation advisor</h2>
+    <p class="cap" style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);margin:0 0 8px">Suggests target weights from your horizon and risk tolerance \u2014 not from predicting the market.</p>
+    <div id="advQs"></div>
+    <button class="ghost" id="advSuggest" style="margin-top:6px">Suggest allocation</button>
+    <div id="advResult" style="margin-top:12px"></div>
+  </div>
+
   <details>
     <summary>Settings - rate, prices, SIP, targets</summary>
     <div class="grid2">
@@ -222,7 +230,7 @@ const CATS=["India Equity","US Equity","Satellite","Cash"];
 const LABEL={"India Equity":"India Equity","US Equity":"US Equity","Satellite":"Satellite (Multibagger)","Cash":"Cash / Stabiliser"};
 const TAGCLS={"India Equity":"","US Equity":"us","Satellite":"sat","Cash":"cash"};
 const now=new Date();
-const APP_VERSION="2026-06-18-3";
+const APP_VERSION="2026-06-18-4";
 // Auto-updater: on launch, check the server for a newer build and refresh once if found.
 (async function checkUpdate(){
   try{
@@ -270,6 +278,7 @@ const DEF={
     {name:"Cash",cat:"Cash",src:"manual",amt:100000,cur:"INR"}
   ],
   targets:{"India Equity":58,"US Equity":32,"Satellite":0,"Cash":10},
+  adv:{horizon:"20y+",risk:"Balanced",ef:"Yes",sat:"None",lean:"Balanced"},
   rate:94.5, sip:100000, step:5, rateAuto:true, rateUpdated:null, rateSource:null,
   apiKey:"", px:{}, nav:{}, startY:now.getFullYear(), startM:now.getMonth(), updated:null
 };
@@ -291,6 +300,7 @@ async function load(){
   $("tIndia").value=S.targets["India Equity"];$("tUS").value=S.targets["US Equity"];
   $("tSat").value=S.targets["Satellite"];$("tCash").value=S.targets["Cash"];
   render();
+  renderAdv();
   refreshAll(true);
 }
 async function save(){try{localStorage.setItem("deck-v3",JSON.stringify(S));}catch(e){console.error(e);}}
@@ -500,6 +510,54 @@ function buildBrief(t,total,actions,sn){
   s+=`\nAction items:\n`+(actions.length?actions.map(x=>"  > "+x).join("\n"):"  ok None beyond the SIP above. Stay the course.");
   $("brief").textContent=s;
 }
+
+// ---------- allocation advisor ----------
+const ADV_Q=[
+  {k:"horizon",label:"Time horizon",opts:["<5y","5-10y","10-20y","20y+"]},
+  {k:"risk",label:"If your portfolio dropped 40%, you would",opts:["Sell (Conservative)","Hold (Balanced)","Hold+some buy (Growth)","Buy a lot (Aggressive)"]},
+  {k:"ef",label:"Emergency fund held separately?",opts:["Yes","No"]},
+  {k:"sat",label:"Stock-picking involvement",opts:["None","Small","Moderate"]},
+  {k:"lean",label:"India / US lean",opts:["Home-heavy","Balanced","Global"]}
+];
+const RISKMAP={"Sell (Conservative)":"Conservative","Hold (Balanced)":"Balanced","Hold+some buy (Growth)":"Growth","Buy a lot (Aggressive)":"Aggressive"};
+function renderAdv(){
+  const box=$("advQs");if(!box)return;box.innerHTML="";
+  ADV_Q.forEach(q=>{const d=document.createElement("div");d.style.margin="10px 0";
+    d.innerHTML=`<div class="cap" style="text-transform:none;letter-spacing:0;color:var(--muted);font-size:12px;margin-bottom:5px">${q.label}</div>`;
+    const g=document.createElement("div");g.className="srcpick";
+    q.opts.forEach(o=>{const b=document.createElement("button");b.textContent=o;if(S.adv[q.k]===o)b.className="on";
+      b.onclick=()=>{S.adv[q.k]=o;save();renderAdv();};g.appendChild(b);});
+    d.appendChild(g);box.appendChild(d);});
+}
+function suggestAlloc(){
+  const a=S.adv;
+  const baseEq={"<5y":40,"5-10y":60,"10-20y":75,"20y+":85}[a.horizon]||75;
+  const riskAdj={Conservative:-15,Balanced:0,Growth:5,Aggressive:10}[RISKMAP[a.risk]||"Balanced"]||0;
+  let eq=Math.max(30,Math.min(90,baseEq+riskAdj));
+  let cash=100-eq, efNote="";
+  if(a.ef==="No"){cash=Math.max(cash,20);efNote="Build an emergency fund outside this portfolio first \u2014 cash kept higher until you do.";}
+  else cash=Math.max(5,cash);
+  cash=Math.round(cash); eq=100-cash;
+  const satShare={None:0,Small:10,Moderate:20}[a.sat]||0;
+  let sat=Math.round(eq*satShare/100);
+  const remEq=eq-sat;
+  const ln={"Home-heavy":[75,25],"Balanced":[60,40],"Global":[50,50]}[a.lean]||[60,40];
+  let us=Math.round(remEq*ln[1]/100);
+  let india=100-cash-sat-us;
+  return {targets:{"India Equity":india,"US Equity":us,"Satellite":sat,"Cash":cash},efNote,eq};
+}
+function showAlloc(){
+  const r=suggestAlloc(),box=$("advResult");
+  let h=`<div style="font-weight:600;font-size:13px;margin-bottom:6px">Suggested targets \u00b7 equity ${r.eq}%</div>`;
+  CATS.forEach(c=>h+=`<div style="display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line)"><span>${LABEL[c]}</span><span style="font-family:var(--mono)">${r.targets[c]}%</span></div>`);
+  h+=`<div class="disc">Based on your horizon and risk tolerance. ${r.efNote} A strategic mix to hold and rebalance to periodically \u2014 not a call to time the market. Educational, not personalised advice.</div>`;
+  h+=`<button class="ghost" id="advApply" style="margin-top:10px">Apply to my targets</button><span class="msg" id="advMsg"></span>`;
+  box.innerHTML=h;
+  $("advApply").onclick=()=>{S.targets={...r.targets};
+    $("tIndia").value=r.targets["India Equity"];$("tUS").value=r.targets["US Equity"];$("tSat").value=r.targets["Satellite"];$("tCash").value=r.targets["Cash"];
+    save();render();$("advMsg").textContent=" Applied \u2713";};
+}
+$("advSuggest").onclick=showAlloc;
 
 $("addBtn").onclick=()=>{const name=$("hName").value.trim(),amt=parseFloat($("hAmt").value);if(!name||isNaN(amt))return;
   S.holdings.push({name,cat:$("hCat").value,src:"manual",amt,cur:$("hCur").value});$("hName").value="";$("hAmt").value="";touch();save();render();};
