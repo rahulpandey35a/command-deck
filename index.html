@@ -138,9 +138,36 @@
     <h2>Portfolio <span class="upd" id="updStamp"></span></h2>
     <div class="total" id="totalVal">-</div>
     <div class="cap" id="totalCap">Total value in INR</div>
+    <div class="cap" id="sinceLast" style="margin-top:4px"></div>
     <button class="ghost" id="refreshAll" style="margin-top:12px">Refresh prices &amp; NAVs</button>
     <div class="msg" id="liveMsg" style="color:var(--muted)"></div>
+    <div id="rebNudge" style="margin-top:10px"></div>
     <div id="allocBlock" style="margin-top:16px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Performance</h2>
+    <div class="deploy-top">
+      <div class="stat"><div class="k">Invested</div><div class="v" id="perfInv">-</div></div>
+      <div class="stat"><div class="k">Current</div><div class="v" id="perfCur">-</div></div>
+    </div>
+    <div id="perfGain" style="margin-top:10px;font-family:var(--mono);font-size:15px"></div>
+    <div class="lump" style="margin-top:10px">
+      <input id="invEdit" type="number" step="any" placeholder="Set total invested so far (INR)">
+      <button class="ghost" id="invSet">Set</button>
+    </div>
+    <button class="ghost" id="invAddSip" style="margin-top:8px">+ Add this month's SIP to invested</button>
+    <span class="msg" id="invMsg"></span>
+    <div class="disc">Update "invested" when you add money (or tap the button each month). Returns shown are simple gain over cost, not annualised.</div>
+  </div>
+
+  <div class="card">
+    <h2>Backup &amp; restore</h2>
+    <p class="cap" style="text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);margin:0 0 8px">Your data lives only on this phone. Copy a backup into your Notes app; paste it back here anytime to restore.</p>
+    <button class="ghost" id="backupBtn">Copy backup</button>
+    <textarea id="backupBox" placeholder="Backup text appears here after Copy. To restore: paste your saved backup and tap Restore." style="margin-top:8px;min-height:80px;font-size:11px"></textarea>
+    <button class="ghost" id="restoreBtn" style="margin-top:8px">Restore from pasted text</button>
+    <span class="msg" id="backupMsg"></span>
   </div>
 
   <div class="card">
@@ -230,7 +257,7 @@ const CATS=["India Equity","US Equity","Satellite","Cash"];
 const LABEL={"India Equity":"India Equity","US Equity":"US Equity","Satellite":"Satellite (Multibagger)","Cash":"Cash / Stabiliser"};
 const TAGCLS={"India Equity":"","US Equity":"us","Satellite":"sat","Cash":"cash"};
 const now=new Date();
-const APP_VERSION="2026-06-18-5";
+const APP_VERSION="2026-06-18-6";
 // Auto-updater: on launch, check the server for a newer build and refresh once if found.
 (async function checkUpdate(){
   try{
@@ -279,11 +306,13 @@ const DEF={
   ],
   targets:{"India Equity":58,"US Equity":32,"Satellite":0,"Cash":10},
   adv:{horizon:"20y+",risk:"Balanced",ef:"Yes",sat:"None",lean:"Balanced"},
+  invested:0, lastRebalance:null, lastSnap:null,
   rate:94.5, sip:100000, step:5, rateAuto:true, rateUpdated:null, rateSource:null,
   apiKey:"", px:{}, nav:{}, startY:now.getFullYear(), startM:now.getMonth(), updated:null
 };
 let S=JSON.parse(JSON.stringify(DEF));
 let EDIT=-1;
+let PREV=null;
 
 const fmt=n=>"\u20b9"+Math.round(n).toLocaleString("en-IN");
 const fUsd=n=>"$"+(Math.round(n*100)/100).toLocaleString("en-US");
@@ -299,9 +328,13 @@ async function load(){
   $("sStart").value=`${S.startY}-${String(S.startM+1).padStart(2,"0")}`;
   $("tIndia").value=S.targets["India Equity"];$("tUS").value=S.targets["US Equity"];
   $("tSat").value=S.targets["Satellite"];$("tCash").value=S.targets["Cash"];
+  if(!S.lastRebalance)S.lastRebalance=Date.now();
+  $("invEdit").value=S.invested||"";
+  PREV=S.lastSnap?{...S.lastSnap}:null;
   render();
   renderAdv();
-  refreshAll(true);
+  await refreshAll(true);
+  S.lastSnap={total:totals().total,ts:Date.now()};save();render();
 }
 async function save(){try{localStorage.setItem("deck-v3",JSON.stringify(S));}catch(e){console.error(e);}}
 function touch(){S.updated=Date.now();}
@@ -415,6 +448,27 @@ function render(){
   $("totalVal").textContent=total>0?fmt(total):"-";
   $("totalCap").textContent=total>0?`Total in INR \u00b7 USD @ \u20b9${(+S.rate).toFixed(2)}/$ ${S.rateAuto===false?"(manual)":"(auto)"}`:"Total value in INR";
   if($("rateStatus"))$("rateStatus").textContent=rateStatusText();
+
+  // since last open
+  if($("sinceLast")){
+    if(PREV&&PREV.total>0&&total>0){const dl=total-PREV.total,p=dl/PREV.total*100;
+      $("sinceLast").innerHTML=`Since last open (${new Date(PREV.ts).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}): <span style="color:${dl>=0?"var(--green)":"var(--red)"}">${dl>=0?"+":""}${fmt(dl)} (${p>=0?"+":""}${p.toFixed(2)}%)</span>`;}
+    else $("sinceLast").textContent="";
+  }
+  // performance
+  if($("perfInv")){const inv=Number(S.invested)||0;
+    $("perfInv").textContent=inv>0?fmt(inv):"-";$("perfCur").textContent=total>0?fmt(total):"-";
+    if(inv>0&&total>0){const g=total-inv,gp=g/inv*100;
+      $("perfGain").innerHTML=`<span style="color:${g>=0?"var(--green)":"var(--red)"}">${g>=0?"+":""}${fmt(g)} (${gp>=0?"+":""}${gp.toFixed(1)}%)</span> gain/loss`;}
+    else $("perfGain").textContent="Set your total invested below to track returns.";
+  }
+  // rebalance reminder
+  if($("rebNudge")){const days=S.lastRebalance?(Date.now()-S.lastRebalance)/864e5:0;
+    if(days>182){const mo=Math.round(days/30.44);
+      $("rebNudge").innerHTML=`<div style="background:var(--amber-soft);border-radius:9px;padding:10px 12px;font-size:13px">It's been ~${mo} months since your last rebalance check. Review drift, then <button class="ghost" id="rebDone" style="padding:5px 9px">Mark rebalanced</button></div>`;
+      const rb=$("rebDone");if(rb)rb.onclick=()=>{S.lastRebalance=Date.now();save();render();};}
+    else $("rebNudge").innerHTML="";
+  }
 
   const ab=$("allocBlock");ab.innerHTML="";
   if(total>0)CATS.forEach(c=>{const pct=t[c]/total*100,tg=S.targets[c]||0,dr=pct-tg;
@@ -558,6 +612,16 @@ function showAlloc(){
     save();render();$("advMsg").textContent=" Applied \u2713";};
 }
 $("advSuggest").onclick=showAlloc;
+
+$("invSet").onclick=()=>{S.invested=+$("invEdit").value||0;save();render();$("invMsg").textContent=" Set \u2713";};
+$("invAddSip").onclick=()=>{S.invested=(Number(S.invested)||0)+sipNow();$("invEdit").value=Math.round(S.invested);save();render();$("invMsg").textContent=` Added ${fmt(sipNow())} \u2713`;};
+$("backupBtn").onclick=()=>{const b=JSON.stringify(S);$("backupBox").value=b;try{navigator.clipboard&&navigator.clipboard.writeText(b);}catch(e){}$("backupMsg").textContent=" Copied \u2014 paste into Notes to keep it safe.";};
+$("restoreBtn").onclick=()=>{try{const d=JSON.parse($("backupBox").value);if(!d||!d.holdings)throw 0;
+  S={...DEF,...d};S.targets={...DEF.targets,...(d.targets||{})};S.adv={...DEF.adv,...(d.adv||{})};S.px=d.px||{};S.nav=d.nav||{};
+  $("invEdit").value=S.invested||"";$("sRate").value=S.rate;$("sApiKey").value=S.apiKey||"";
+  $("tIndia").value=S.targets["India Equity"];$("tUS").value=S.targets["US Equity"];$("tSat").value=S.targets["Satellite"];$("tCash").value=S.targets["Cash"];
+  save();render();renderAdv();$("backupMsg").textContent=" Restored \u2713";
+}catch(e){$("backupMsg").textContent=" Couldn't read that backup text \u2014 check you pasted the whole thing.";}};
 
 $("addBtn").onclick=()=>{const name=$("hName").value.trim(),amt=parseFloat($("hAmt").value);if(!name||isNaN(amt))return;
   S.holdings.push({name,cat:$("hCat").value,src:"manual",amt,cur:$("hCur").value});$("hName").value="";$("hAmt").value="";touch();save();render();};
