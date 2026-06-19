@@ -407,13 +407,17 @@ function render(){
   S.holdings.forEach((h,i)=>{
     const val=holdINR(h);
     const wrap=document.createElement("div");wrap.style.borderBottom="1px solid var(--line)";wrap.style.padding="9px 0";
-    let sub="";
-    if(h.src==="us"){const p=(S.px[h.sym]!=null?S.px[h.sym]:h.px)||0;sub=`<span class="hv">${(+h.qty).toFixed(4)} sh \u00d7 ${fUsd(p)}${S.px[h.sym]!=null?'<span class="live"> live</span>':' last'}</span>`;}
+    let sub="", usd=null;
+    if(h.src==="us"){const p=(S.px[h.sym]!=null?S.px[h.sym]:h.px)||0;usd=(Number(h.qty)||0)*p;sub=`<span class="hv">${(+h.qty).toFixed(4)} sh \u00d7 ${fUsd(p)}${S.px[h.sym]!=null?'<span class="live"> live</span>':' last'}</span>`;}
+    else if(h.src==="manual"&&h.cur==="USD"){usd=Number(h.amt)||0;sub=`<span class="hv">manual</span>`;}
     else if(h.src==="mf"){const n=S.nav[h.scheme];sub = h.scheme?(n?`<span class="hv">NAV \u20b9${n.nav}${h.units>0?` \u00d7 ${h.units} u`:" \u00b7 set units"}</span>`:`<span class="hv">code ${h.scheme} \u00b7 NAV pending</span>`):`<span class="hv">no scheme code \u00b7 manual</span>`;}
     else sub=`<span class="hv">manual</span>`;
+    const valBlock = usd!=null
+      ? `<div class="num" style="font-family:var(--mono)">${fUsd(usd)}</div><div class="num" style="font-family:var(--mono);color:var(--muted);font-size:12px">${fmt(val)}</div>`
+      : `<div class="num" style="font-family:var(--mono)">${fmt(val)}</div>`;
     wrap.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
       <div><div style="font-size:14px">${h.name} <span class="tag ${TAGCLS[h.cat]}">${LABEL[h.cat]}</span></div>${sub}</div>
-      <div style="text-align:right"><div class="num" style="font-family:var(--mono)">${fmt(val)}</div>
+      <div style="text-align:right">${valBlock}
         <button class="del" data-e="${i}" style="color:var(--muted);font-size:13px">edit</button>
         <button class="del" data-d="${i}">\u00d7</button></div></div>`;
     HL.appendChild(wrap);
