@@ -214,7 +214,7 @@
 
   <p class="disc">Prices/NAVs/rate auto-update from free public sources; everything is editable. Not investment advice.
   Rules: rebalance flag at &gt;5pp drift; satellite cap 20% of equity; single satellite position flagged above 8%.
-  Most days the verdict is "stay the course".</p>
+  Most days the verdict is "stay the course". <span id="ver" style="opacity:.6"></span></p>
 </div>
 
 <script>
@@ -222,6 +222,19 @@ const CATS=["India Equity","US Equity","Satellite","Cash"];
 const LABEL={"India Equity":"India Equity","US Equity":"US Equity","Satellite":"Satellite (Multibagger)","Cash":"Cash / Stabiliser"};
 const TAGCLS={"India Equity":"","US Equity":"us","Satellite":"sat","Cash":"cash"};
 const now=new Date();
+const APP_VERSION="2026-06-18-3";
+// Auto-updater: on launch, check the server for a newer build and refresh once if found.
+(async function checkUpdate(){
+  try{
+    const r=await fetch(location.pathname+"?cb="+Date.now(),{cache:"no-store"});
+    const txt=await r.text();
+    const m=txt.match(/APP_VERSION="([^"]+)"/);
+    if(m&&m[1]!==APP_VERSION&&sessionStorage.getItem("cd_upd")!==m[1]){
+      sessionStorage.setItem("cd_upd",m[1]);
+      location.replace(location.pathname+"?v="+encodeURIComponent(m[1]));
+    }
+  }catch(e){}
+})();
 const DEF={
   holdings:[
     {name:"ICICI Pru Large & Mid Cap",cat:"India Equity",src:"mf",scheme:"",units:0,amt:379871,cur:"INR"},
@@ -503,6 +516,7 @@ $("saveBtn").onclick=()=>{S.rateAuto=$("sRateAuto").checked;S.rate=+$("sRate").v
 $("copyBtn").onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText($("brief").textContent);$("copyBtn").textContent="Copied";setTimeout(()=>$("copyBtn").textContent="Copy brief",1500);};
 
 load();
+(function(){var e=document.getElementById("ver");if(e)e.textContent="v"+APP_VERSION;})();
 </script>
 </body>
 </html>
